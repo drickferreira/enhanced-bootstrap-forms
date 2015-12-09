@@ -1,6 +1,6 @@
 {
-    "name": "dickferreira/enhanceed-bootstrap-forms",
-    "description": "Reduce the boilerplate code required to get forms in Laravel to have Bootstrap styling",
+    "name": "dickferreira/enhanced-bootstrap-forms",
+    "description": "Integrates Bootstrap and Html Forms with enhanced functionalities",
     "license": "MIT",
     "authors": [
         {
