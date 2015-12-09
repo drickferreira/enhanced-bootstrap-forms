@@ -23,10 +23,8 @@ class BootstrapFormsServiceProvider extends IlluminateHtmlServiceProvider
         if (version_compare($app::VERSION, '5.1') < 0) {
             $this->package('drickferreira/bootstrap-forms');
         }
-
-        $this->publishes([
-        __DIR__.'/../../../twbs/bootstrap/dist/' => public_path('assets'),
-        ], 'public');
+        $twbsPath = '/vendor/twbs/bootstrap/dist';
+        $this->publishes([$twbsPath => public_path('assets')]);
 
     }
 
