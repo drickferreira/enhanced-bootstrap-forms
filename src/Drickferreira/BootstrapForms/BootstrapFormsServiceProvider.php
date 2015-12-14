@@ -19,7 +19,7 @@ class BootstrapFormsServiceProvider extends IlluminateHtmlServiceProvider
      */
     public function boot()
     {
-        $twbsPath = '/teste/vendor/twbs/bootstrap/dist';
+        $twbsPath = 'vendor/twbs/bootstrap/dist';
         $this->publishes([$twbsPath => public_path('assets')]);
 
     }

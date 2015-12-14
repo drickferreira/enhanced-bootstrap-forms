@@ -20,6 +20,116 @@ class FormBuilder extends IlluminateFormBuilder
      * @var array
      */
     protected $groupOptions = [];
+    protected $formConfig = [];
+
+    /**
+     * Bootstrap Form default config
+     * class: form css class
+     * columns: number of form columns
+     * labelWidth: width of label element in Bootstrap grid units
+     * objectWidth: width of div container of form element in Bootstrap grid units
+     */
+
+    protected $defaultConfig = array(
+        'default' => array(
+                'class' => '',
+                'columns' => 1,
+                'labelWidth' => 0,
+                'objectWidth' => 0,
+                'labelOptions' => [],
+                'objectOptions' => [],
+            ),
+        'inline' => array(
+                'class' => 'form-inline',
+                'columns' => 1,
+                'labelWidth' => 0,
+                'objectWidth' => 0,
+                'labelOptions' => [],
+                'objectOptions' => [],
+            ),
+        'horizontal' => array(
+                'class' => 'form-horizontal',
+                'columns' => 1,
+                'labelWidth' => 2,
+                'objectWidth' => 10,
+                'labelOptions' => [],
+                'objectOptions' => [],
+            ),
+        '2column' => array(
+                'class' => 'form-horizontal',
+                'columns' => 2,
+                'labelWidth' => 2,
+                'objectWidth' => 4,
+                'labelOptions' => [],
+                'objectOptions' => [],
+            ),
+        );
+
+    /**
+     * Horizontal
+     */
+
+    public function loadConfig($config = 'default')
+    {
+        $this->formConfig = array_get($this->defaultConfig, $config, 'default');
+    }
+
+    public function config(array $config = [])
+    {
+        $this->formConfig = array(
+                'class' => isset($config['class']) ? $config['class'] : '',
+                'columns' => isset($config['columns']) ? $config['columns'] : 1,
+                'labelWidth' => isset($config['labelWidth']) ? $config['labelWidth'] : 0,
+                'objectWidth' => isset($config['objectWidth']) ? $config['objectWidth'] : '',
+                'labelOptions' => isset($config['labelOptions']) ? $config['labelOptions'] : [],
+                'objectOptions' => isset($config['objectOptions']) ? $config['objectOptions'] : [],
+            );
+    }
+
+    public function open(array $options = [])
+    {
+        $method = array_get($options, 'method', 'post');
+
+        if($this->formConfig == []){
+            $this->loadConfig();
+        }
+
+        $options = $this->appendClassToOptions($this->formConfig['class'], $options);
+
+        // We need to extract the proper method from the attributes. If the method is
+        // something other than GET or POST we'll use POST since we will spoof the
+        // actual method since forms don't support the reserved methods in HTML.
+        $attributes['method'] = $this->getMethod($method);
+        $attributes['action'] = $this->getAction($options);
+        $attributes['accept-charset'] = 'UTF-8';
+
+        // If the method is PUT, PATCH or DELETE we will need to add a spoofer hidden
+        // field that will instruct the Symfony request to pretend the method is a
+        // different method than it actually is, for convenience from the forms.
+        $append = $this->getAppendage($method);
+
+          if (isset($options['files']) && $options['files']) {
+              $options['enctype'] = 'multipart/form-data';
+          }
+
+        // Finally we're ready to create the final form HTML field. We will attribute
+        // format the array of attributes. We will also add on the appendage which
+        // is used to spoof requests for this PUT, PATCH, etc. methods on forms.
+        $attributes = array_merge(
+
+          $attributes, array_except($options, $this->reserved)
+
+        );
+
+        // Finally, we will concatenate all of the attributes into a single string so
+        // we can build out the final form open statement. We'll also append on an
+        // extra value for the hidden _method field if it's needed for the form.
+        $attributes = $this->html->attributes($attributes);
+
+          return '<form'.$attributes.'>'.$append;
+    }
+
+
 
     /**
      * Open a new form group.
@@ -33,9 +143,7 @@ class FormBuilder extends IlluminateFormBuilder
      */
     public function openGroup(
         $name,
-        $label = null,
-        $options = [],
-        $labelOptions = []
+        $options = []
     ) {
         $options = $this->appendClassToOptions('form-group', $options);
 
@@ -53,10 +161,6 @@ class FormBuilder extends IlluminateFormBuilder
             }
         }
 
-        // If a label is given, we set it up here. Otherwise, we will just
-        // set it to an empty string.
-        $label = $label ? $this->label($name, $label, $labelOptions) : '';
-
         $attributes = [];
         foreach ($options as $key => $value) {
             if (!in_array($key, ['errorBlock'])) {
@@ -64,7 +168,7 @@ class FormBuilder extends IlluminateFormBuilder
             }
         }
 
-        return '<div' . $this->html->attributes($attributes) . '>' . $label;
+        return '<div' . $this->html->attributes($attributes) . '>';// . $label;
     }
 
     /**
@@ -82,14 +186,8 @@ class FormBuilder extends IlluminateFormBuilder
         // This way we can check if error blocks were enabled
         $options = array_pop($this->groupOptions);
 
-        // Check to see if we are to include the formatted help block
-        if ($this->errorBlockEnabled($options)) {
-            // Get the formatted errors for this form group.
-            $errors = $this->getFormattedErrors($name);
-        }
-
         // Append the errors to the group and close it out.
-        return $errors . '</div>';
+        return '</div>';
     }
 
     /**
@@ -104,14 +202,28 @@ class FormBuilder extends IlluminateFormBuilder
      */
     public function input($type, $name, $value = null, $options = [])
     {
+        //Capture label
+        $label = $type != 'hidden' ? $this->getLabel($name, $options) : '';
+
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+
         // Don't add form-control for some input types (like submit, checkbox, radio)
-        if (!in_array($type, ['submit', 'checkbox', 'radio', 'reset', 'file'])) {
+        if (!in_array($type, ['hidden', 'submit', 'checkbox', 'radio', 'reset', 'file'])) {
             $options = $this->appendClassToOptions('form-control', $options);
-        }
+        } 
 
         // Call the parent input method so that Laravel can handle
         // the rest of the input set up.
-        return parent::input($type, $name, $value, $options);
+        $object = parent::input($type, $name, $value, $options);
+
+        if ($type == 'hidden' )
+        {
+            return $object;
+        }
+
+        return $this->wrapObject($name, $label,$class,$object);
+
     }
 
     /**
@@ -126,11 +238,20 @@ class FormBuilder extends IlluminateFormBuilder
      */
     public function select($name, $list = [], $selected = null, $options = [])
     {
+        //Capture label
+        $label = $this->getLabel($name, $options);
+
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+
         $options = $this->appendClassToOptions('form-control', $options);
 
         // Call the parent select method so that Laravel can handle
         // the rest of the select set up.
-        return parent::select($name, $list, $selected, $options);
+        $object = parent::select($name, $list, $selected, $options);
+
+        return $this->wrapObject($name, $label,$class,$object);
+
     }
 
     /**
@@ -180,6 +301,7 @@ class FormBuilder extends IlluminateFormBuilder
      */
     protected function checkable($type, $name, $value, $checked, $options)
     {
+
         $checked = $this->getCheckedState($type, $name, $value, $checked);
 
         if ($checked) {
@@ -187,6 +309,7 @@ class FormBuilder extends IlluminateFormBuilder
         }
 
         return parent::input($type, $name, $value, $options);
+
     }
 
     /**
@@ -205,11 +328,16 @@ class FormBuilder extends IlluminateFormBuilder
         $checked = null,
         $options = []
     ) {
-        $checkable = parent::checkbox($name, $value, $checked, $options);
+        //Capture label
+        $label = $this->getLabel($name, $options, '');
 
-        return array_key_exists('label', $options) ?
-            $this->wrapCheckable($options['label'], 'checkbox', $checkable) :
-            $checkable;
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+        $class = $this->appendClassToOptions('checkbox', $class);
+
+        $object = parent::checkbox($name, $value, $checked, $options);
+
+        return $label != '' ? $this->wrapCheckable($label, $class, $object) : $this->wrapObject($name,$label,$class,$object);
     }
 
     /**
@@ -230,9 +358,17 @@ class FormBuilder extends IlluminateFormBuilder
         $checked = null,
         $options = []
     ) {
-        $checkable = parent::radio($name, $value, $checked, $options);
+        //Capture label
+        $label = $this->getLabel($name, $options, false);
 
-        return $this->wrapCheckable($label, 'radio', $checkable);
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+        $class = $this->appendClassToOptions('radio', $class);
+
+        $object = parent::radio($name, $value, $checked, $options);
+
+        return $this->wrapCheckable($label, $class, $object);
+
     }
 
     /**
@@ -253,9 +389,15 @@ class FormBuilder extends IlluminateFormBuilder
         $checked = null,
         $options = []
     ) {
-        $checkable = parent::checkbox($name, $value, $checked, $options);
 
-        return $this->wrapInlineCheckable($label, 'checkbox', $checkable);
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+        $class = $this->appendClassToOptions('checkbox-inline', $class);
+
+        $object = parent::checkbox($name, $value, $checked, $options);
+
+        return $this->wrapCheckable($label, $class, $object);
+
     }
 
     /**
@@ -276,9 +418,17 @@ class FormBuilder extends IlluminateFormBuilder
         $checked = null,
         $options = []
     ) {
-        $checkable = parent::radio($name, $value, $checked, $options);
+        //Capture label
+        $label = $this->getLabel($name, $options, false);
 
-        return $this->wrapInlineCheckable($label, 'radio', $checkable);
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+        $class = $this->appendClassToOptions('radio-inline', $class);
+
+        $object = parent::radio($name, $value, $checked, $options);
+
+        return $this->wrapCheckable($label, $class, $object);
+
     }
 
     /**
@@ -292,9 +442,17 @@ class FormBuilder extends IlluminateFormBuilder
      */
     public function textarea($name, $value = null, $options = [])
     {
+        //Capture label
+        $label = $type != 'hidden' ? $this->getLabel($name, $options) : '';
+
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+
         $options = $this->appendClassToOptions('form-control', $options);
 
-        return parent::textarea($name, $value, $options);
+        $object = parent::textarea($name, $value, $options);
+
+        return $this->wrapObject($name,$label,$class,$object);
     }
 
     /**
@@ -353,6 +511,7 @@ class FormBuilder extends IlluminateFormBuilder
         // Check if the errors contain the form element with the given name.
         // This leverages Laravel's transformKey method to handle the
         // formatting of the form element's name.
+
         return $errors->has($this->transformKey($name));
     }
 
@@ -380,33 +539,40 @@ class FormBuilder extends IlluminateFormBuilder
     }
 
     /**
-     * Wrap the given checkable in the necessary wrappers.
+     * Wrap the given object in the necessary wrappers.
      *
-     * @param  mixed  $label
-     * @param  string $type
-     * @param  string $checkable
+     * @param  mixed $label
+     * @param  array $options
+     * @param  string $object
      *
      * @return string
      */
-    private function wrapCheckable($label, $type, $checkable)
+    private function wrapObject($name, $label, $options, $object)
     {
-        return '<div class="' . $type . '"><label>' . $checkable . ' ' . $label
-        . '</label></div>';
+        $errors = '';
+        // Check to see if we are to include the formatted help block
+        if ($this->errorBlockEnabled($options)) {
+            // Get the formatted errors for this form group.
+            $errors = $this->getFormattedErrors($name);
+        }
+
+        return $label. '<div '. $this->html->attributes($options).'>'.$object.$errors.'</div>';
     }
 
+
     /**
-     * Wrap the given checkable in the necessary inline wrappers.
+     * Wrap the given checkable in the necessary wrappers.
      *
-     * @param  mixed  $label
-     * @param  string $type
-     * @param  string $checkable
+     * @param  mixed $label
+     * @param  array $options
+     * @param  string $object
      *
      * @return string
      */
-    private function wrapInlineCheckable($label, $type, $checkable)
+    private function wrapCheckable($label, $option, $object)
     {
-        return '<div class="' . $type . '-inline">' . $checkable . ' ' . $label
-        . '</div>';
+        return '<div '. $this->html->attributes($option). '><label>' . $object . ' ' . $label
+        . '</label></div>';
     }
 
     /**
@@ -429,4 +595,70 @@ class FormBuilder extends IlluminateFormBuilder
         // Default to true if it does not exist
         return true;
     }
+
+    private function getOption($name, array &$options = [], $val = false)
+    {
+        if (array_has($options, $name))
+        {
+            $val = array_get($options, $name);
+            array_forget($options, $name);
+        } 
+        return $val;
+    }
+
+    private function getLabel($name, array &$options = [], $wrap = true)
+    {
+        $label = $this->getOption('label', $options);
+        if (!$label) return ''; 
+        if (!$wrap) return $label;
+
+        $labelOptions = $this->getOption('labelOptions', $options) ? $this->getOption('labelOptions', $options) : array_get($this->formConfig, 'labelOptions');
+
+        $class = $this->getOption('labelClass', $labelOptions);
+        if (!$class)
+        {
+            $labelWidth = array_get($this->formConfig, 'labelWidth');
+            if($labelWidth>0) 
+                $class = 'col-md-'.$labelWidth.' control-label';
+        }
+
+        $labelOptions = $this->appendClassToOptions($class, $labelOptions);
+
+        return $this->label($name, $label, $labelOptions);
+
+    }
+
+    private function getClasses($name, array &$options = [])
+    {
+        $returnOptions = [];
+        $offset = $this->getOption('offset', $options, 0);
+        $returnOptions = $offset > 0 ? $this->appendClassToOptions('col-md-offset-'.$offset, $returnOptions) : [];
+
+        $objectWidth = $this->formConfig['objectWidth'];
+        $labelWidth = $this->formConfig['labelWidth'];
+        $extend = $this->getOption('extend', $options);
+
+        if ($extend == 'group'){
+            $objectWidth += $labelWidth;
+        } else if ($extend == 'full'){
+            $aux = 0;
+            for ($i = 0; $i < $this->formConfig['columns']; $i++){
+                $aux += $objectWidth + $labelWidth;
+            }
+            if (in_array($name, $this->labels))
+                $aux -= $labelWidth;
+            $objectWidth = $aux;
+        } else if ($extend > 1 && $extend < 12){
+            $objectWidth += $extend;
+        } 
+
+        $objectWidth = $objectWidth > 12 ? 12 : $objectWidth;
+
+        $widthClass = $objectWidth>0 ? 'col-md-'.$objectWidth : '';
+
+        $returnOptions = $this->appendClassToOptions($widthClass, $returnOptions);
+
+        return $returnOptions;
+    }
+
 }
