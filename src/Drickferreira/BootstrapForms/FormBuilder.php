@@ -21,6 +21,7 @@ class FormBuilder extends IlluminateFormBuilder
      */
     protected $groupOptions = [];
     protected $formConfig = [];
+    protected $opened = false;
 
     /**
      * Bootstrap Form default config
@@ -93,6 +94,7 @@ class FormBuilder extends IlluminateFormBuilder
         if($this->formConfig == []){
             $this->loadConfig();
         }
+        $this->opened = true;
 
         $options = $this->appendClassToOptions($this->formConfig['class'], $options);
 
@@ -225,6 +227,26 @@ class FormBuilder extends IlluminateFormBuilder
         return $this->wrapObject($name, $label,$class,$object);
 
     }
+
+    public function staticElement($name, $value = null, $options = [])
+    {
+        //Capture label
+        $label = $this->getLabel($name, $options);
+
+        //Capture Bootstrap classes
+        $class = $this->getClasses($name,$options);
+        $class = $this->appendClassToOptions('form-control-static', $class);
+        $class['name'] = $name;
+        $class['id'] = $name;
+
+        // Call the parent input method so that Laravel can handle
+        // the rest of the input set up.
+        $object = '<p'. $this->html->attributes($class) .'>'. $value.'</p>';
+
+        return $this->wrapObject($name, $label,$class,$object);
+
+    }
+
 
     /**
      * Create a select box field.
@@ -630,6 +652,7 @@ class FormBuilder extends IlluminateFormBuilder
 
     private function getClasses($name, array &$options = [])
     {
+        if (!$this->opened) return [];
         $returnOptions = [];
         $offset = $this->getOption('offset', $options, 0);
         $returnOptions = $offset > 0 ? $this->appendClassToOptions('col-md-offset-'.$offset, $returnOptions) : [];
