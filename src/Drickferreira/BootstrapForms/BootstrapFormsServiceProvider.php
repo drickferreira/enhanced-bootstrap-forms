@@ -1,5 +1,5 @@
 <?php namespace Drickferreira\BootstrapForms;
-
+ 
 use Collective\Html\HtmlServiceProvider as IlluminateHtmlServiceProvider;
 
 class BootstrapFormsServiceProvider extends IlluminateHtmlServiceProvider
